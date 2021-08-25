@@ -2,11 +2,9 @@ import os
 import json
 import time
 import torch
-import operator
-from functools import reduce
 import matplotlib.pyplot as plt
 import collections
-from .utils import xmkdir
+from utils import xmkdir
 
 
 class TotalAverage():

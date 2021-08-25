@@ -65,19 +65,20 @@ def make_dataset(dir):
             expression_list = os.listdir(os.path.join(dir, session, object))
             for expression in expression_list:
                 left_list = os.listdir(os.path.join(dir, session, object, expression, '13_0'))
-                # frontal_list = os.listdir(os.path.join(dir, session, object, expression, '05_1'))
+                frontal_list = os.listdir(os.path.join(dir, session, object, expression, '05_1'))
                 right_list = os.listdir(os.path.join(dir, session, object, expression, '04_1'))
 
 
                 for i in range(rand_num):
                     left = random.choice(left_list)
-                    # frontal = random.choice(frontal_list)
+                    frontal = random.choice(frontal_list)
                     right = random.choice(right_list)
 
                     left_path = os.path.join(dir, session, object, expression, '13_0', left)
-                    # frontal_path = os.path.join(dir, session, object, expression, '05_1', frontal)
+                    frontal_path = os.path.join(dir, session, object, expression, '05_1', frontal)
                     right_path = os.path.join(dir, session, object, expression, '04_1', right)
-                    images.append([left_path, right_path])
+                    images.append([frontal_path, right_path])
+                    images.append([frontal_path, left_path])
 
     random.shuffle(images)
     return images
@@ -103,7 +104,7 @@ class ImageDataset(torch.utils.data.Dataset):
         img1_tensor = tfs.functional.to_tensor(img1)
         img2_tensor = tfs.functional.to_tensor(img2)
 
-        return torch.stack([img1_tensor, img2_tensor])
+        return img1_tensor, img2_tensor
 
     def __getitem__(self, index):
         fpath = self.paths[index % self.size]

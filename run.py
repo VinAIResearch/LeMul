@@ -1,6 +1,7 @@
 import argparse
-import torch
-from . import setup_runtime, Trainer, LeMul
+from utils import setup_runtime
+from trainer import Trainer
+from model import LeMul
 
 
 ## runtime arguments

@@ -4,10 +4,10 @@ import glob
 import torch
 import torch.nn as nn
 import torchvision
-from . import networks
-from . import utils
+import networks
+import utils
 import numpy as np
-from .renderer import Renderer
+from renderer import Renderer
 
 EPS = 1e-7
 
@@ -130,7 +130,7 @@ class LeMul():
         # ========================================= #
         threshold = 0.5
         variance_c_square = 0.05
-        variance_d_square = 50
+        variance_d_square = 2
         # input_im has shape BxCxHxW,
         input_im_neighbor_diff = torch.nn.functional.conv2d(
             input_im.view(-1, 1, input_im.shape[2], input_im.shape[3]), self.neighbor_kernel,
@@ -274,76 +274,52 @@ class LeMul():
 
     def forward(self, input):
         if self.load_gt_depth:
-            (input, input_rot) , depth_gt = input
+            input, input_flip, depth_gt = input
         else:
-            input, input_rot = input
+            input, input_flip = input
 
-        self.input_ims = input.to(self.device) * 2. - 1.
-        self.input_im_rot = input_rot.to(self.device) * 2. - 1.
-        b, c, h, w = self.input_ims.shape
+        self.input_im = input.to(self.device) * 2. - 1.
+        self.input_im_flip = input_flip.to(self.device) * 2. - 1.
+        b, c, h, w = self.input_im.shape
 
         '''Process Im ne'''
-        self.input_im = self.input_ims
         self.view, self.canon_depth_raw, self.canon_diffuse_shading, self.canon_albedo, self.recon_im, self.recon_depth, self.recon_normal, self.canon_im, self.canon_depth, self.canon_normal, self.conf_sigma_l1, \
         self.conf_sigma_percl, self.canon_light, recon_im_mask, recon_im_mask_both, loss_l1_im, loss_perc_im, albedo_loss, self.loss_im, self.recon_albedo = self.process(
             self.input_im)
 
         '''Process Im_flip ne'''
-        self.input_im_flip = self.input_im.flip(-1)
         self.view_flip, self.canon_depth_raw_flip, self.canon_diffuse_shading_flip, self.canon_albedo_flip, self.recon_im_flip, self.recon_depth_flip, self.recon_normal_flip, self.canon_im_flip, self.canon_depth_flip, self.canon_normal_flip, self.conf_sigma_l1_flip, \
         self.conf_sigma_percl_flip, self.canon_light_flip, recon_im_mask_flip, recon_im_mask_both_flip, loss_l1_im_flip, loss_perc_im_flip, albedo_loss_flip, self.loss_im_flip, self.recon_albedo_flip = self.process(
             self.input_im_flip)
 
-        '''Process Im_rot ne'''
-        self.view_rot, self.canon_depth_raw_rot, self.canon_diffuse_shading_rot, self.canon_albedo_rot, self.recon_im_rot, self.recon_depth_rot, self.recon_normal_rot, self.canon_im_rot, self.canon_depth_rot, self.canon_normal_rot, self.conf_sigma_l1_rot, \
-        self.conf_sigma_percl_rot, self.canon_light_rot, recon_im_mask_rot, recon_im_mask_both_rot, loss_l1_im_rot, loss_perc_im_rot, albedo_loss_rot, self.loss_im_rot, self.recon_albedo_rot = self.process(
-            self.input_im_rot)
-
         '''Tai tao lai '''
         _, _, self.recon_flip_from_im, recon_depth_flip_from_im, _, canon_im_flip_from_im, _, _, recon_im_mask_both_flip_from_im, recon_albedo_flip_from_im = self.render(
             self.canon_albedo, self.canon_depth, self.canon_light_flip, self.view_flip)
+        conf_sigma_l1_norm_flip, conf_sigma_percl_norm_flip = self.netC2(torch.cat((self.input_im, self.input_im_flip), 1))  # Bx1xHxW
         _, _, _, self.loss_flip_from_im = self.loss(self.recon_flip_from_im, self.input_im_flip,
                                                     recon_albedo=recon_albedo_flip_from_im,
                                                     recon_depth=recon_depth_flip_from_im,
                                                     recon_im_mask_both=recon_im_mask_both_flip_from_im,
-                                                    conf_sigma_l1=self.conf_sigma_l1_flip,
-                                                    conf_sigma_percl=self.conf_sigma_percl_flip)
+                                                    conf_sigma_l1=conf_sigma_l1_norm_flip,
+                                                    conf_sigma_percl=conf_sigma_percl_norm_flip)
 
         _, _, self.recon_im_from_flip, recon_depth_im_from_flip, _, canon_im_from_flip, _, _, recon_im_mask_both_from_flip, recon_albedo_im_from_flip = self.render(
             self.canon_albedo_flip, self.canon_depth_flip, self.canon_light, self.view)
+        conf_sigma_l1_norm_im, conf_sigma_percl_norm_im = self.netC2(
+            torch.cat((self.input_im_flip, self.input_im), 1))  # Bx1xHxW
         _, _, _, self.loss_im_from_flip = self.loss(self.recon_im_from_flip, self.input_im,
                                                     recon_albedo=recon_albedo_im_from_flip,
                                                     recon_depth=recon_depth_im_from_flip,
                                                     recon_im_mask_both=recon_im_mask_both_from_flip,
-                                                    conf_sigma_l1=self.conf_sigma_l1,
-                                                    conf_sigma_percl=self.conf_sigma_percl)
+                                                    conf_sigma_l1=conf_sigma_l1_norm_im,
+                                                    conf_sigma_percl=conf_sigma_percl_norm_im)
 
-        _, _, self.recon_rot_from_im, recon_depth_rot_from_im, _, canon_im_rot_from_im, _, _, recon_im_mask_both_rot_from_im, recon_albedo_rot_from_im = self.render(
-            self.canon_albedo, self.canon_depth, self.canon_light_rot, self.view_rot)
-        # conf_sigma_l1_norm_rot, conf_sigma_percl_norm_rot = self.netC2(torch.cat((self.input_im,self.input_im_rot),1))  # Bx1xHxW
-        _, _, _, self.loss_rot_from_im = self.loss(self.recon_rot_from_im, self.input_im_rot,
-                                                   recon_albedo=recon_albedo_rot_from_im,
-                                                   recon_depth=recon_depth_rot_from_im,
-                                                   recon_im_mask_both=recon_im_mask_both_rot_from_im,
-                                                   conf_sigma_l1=self.conf_sigma_l1_rot,  # self.conf_sigma_l1,
-                                                   conf_sigma_percl=self.conf_sigma_percl_rot)  # self.conf_sigma_percl)
-
-        _, _, self.recon_im_from_rot, recon_depth_from_rot, _, canon_im_from_rot, _, _, recon_im_mask_both_from_rot, recon_albedo_im_from_rot = self.render(
-            self.canon_albedo_rot, self.canon_depth_rot, self.canon_light, self.view)
-        _, _, _, self.loss_im_from_rot = self.loss(self.recon_im_from_rot, self.input_im,
-                                                   recon_albedo=recon_albedo_im_from_rot,
-                                                   recon_depth=recon_depth_from_rot,
-                                                   recon_im_mask_both=recon_im_mask_both_from_rot,
-                                                   conf_sigma_l1=self.conf_sigma_l1,  # self.conf_sigma_l1_rot,
-                                                   conf_sigma_percl=self.conf_sigma_percl)  # self.conf_sigma_percl_rot)
 
         self.albedo_loss = albedo_loss
         self.flip_depth_loss = torch.abs(self.canon_depth - self.canon_depth_flip).sum()
         self.flip_albedo_loss = torch.abs(self.canon_albedo - self.canon_albedo_flip).mean()
-        self.rot_depth_loss = torch.abs(self.canon_depth - self.canon_depth_rot).sum()
 
-        self.loss_total = self.loss_im + self.loss_im_flip + self.loss_flip_from_im + self.loss_im_from_flip + 0.001 * self.flip_depth_loss + \
-                          0.3 * (self.loss_im_rot + self.loss_rot_from_im + self.loss_im_from_rot + 0.001 * self.rot_depth_loss)
+        self.loss_total = self.loss_im + self.loss_im_flip + self.loss_flip_from_im + self.loss_im_from_flip
 
         metrics = {'loss': self.loss_total}
 

@@ -3,10 +3,10 @@ import glob
 from datetime import datetime
 import numpy as np
 import torch
-from . import meters
-from . import utils
-from . import networks
-from .dataloaders import get_data_loaders
+import meters
+import utils
+import networks
+from dataloaders import get_data_loaders
 
 
 class Trainer():
