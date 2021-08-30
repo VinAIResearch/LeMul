@@ -3,8 +3,8 @@
 run_test: true
 batch_size: 64
 checkpoint_dir: results/cat
-checkpoint_name: checkpoint100.pth
-test_result_dir: results/cat/test_results_checkpoint100
+checkpoint_name: checkpointXXX.pth
+test_result_dir: results/cat/test_results_checkpointXXX
 
 ## dataloader
 num_workers: 4

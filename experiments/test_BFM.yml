@@ -3,8 +3,8 @@
 run_test: true
 batch_size: 32
 checkpoint_dir: results/synface
-checkpoint_name: checkpoint007.pth
-test_result_dir: results/synface/test_results_checkpoint007
+checkpoint_name: checkpointXXX.pth
+test_result_dir: results/synface/test_results_checkpointXXX
 
 ## dataloader
 num_workers: 4

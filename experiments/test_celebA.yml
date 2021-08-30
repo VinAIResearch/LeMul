@@ -1,10 +1,10 @@
-## test celeba
+## test celebA
 
 run_test: true
 batch_size: 64
 checkpoint_dir: results/celeba
-checkpoint_name: checkpoint030.pth
-test_result_dir: results/celeba/test_results_checkpoint030
+checkpoint_name: checkpointXXX.pth
+test_result_dir: results/celeba/test_results_checkpointXXX
 
 ## dataloader
 num_workers: 4
