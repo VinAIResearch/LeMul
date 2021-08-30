@@ -1,10 +1,10 @@
-## train multi-PIE
+## train cat
 
 run_train: true
-num_epochs: 20
-batch_size: 24
-checkpoint_dir: results/multiPIE
-save_checkpoint_freq: 1
+num_epochs: 200
+batch_size: 32
+checkpoint_dir: results/cat
+save_checkpoint_freq: 10
 keep_num_checkpoint: 2
 resume: true
 use_logger: true
@@ -13,17 +13,20 @@ log_freq: 100
 ## dataloader
 num_workers: 4
 image_size: 64
+crop: 170
 load_gt_depth: false
-train_val_data_dir: data/pie_full
+train_val_data_dir: data/cat_combined
 
 ## model
-model_name: lemul_multiPIE
+model_name: lemul_cat
 min_depth: 0.9
 max_depth: 1.1
 xyz_rotation_range: 60  # (-r,r) in degrees
 xy_translation_range: 0.1  # (-t,t) in 3D
-z_translation_range: 0  # (-t,t) in 3D
+z_translation_range: 0.1  # (-t,t) in 3D
 lam_perc: 1
+lam_flip: 0.5
+lam_flip_start_epoch: 10
 lr: 0.0001
 
 ## renderer

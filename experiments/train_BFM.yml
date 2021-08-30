@@ -1,5 +1,5 @@
 ## train BFM
-## trainer
+
 run_train: true
 num_epochs: 10
 batch_size: 32
@@ -27,7 +27,6 @@ xyz_rotation_range: 90  # (-r,r) in degrees
 xy_translation_range: 0.1  # (-t,t) in 3D
 z_translation_range: 0  # (-t,t) in 3D
 lam_perc: 1
-lam_flip: 0.5
 lr: 0.0001
 
 ## renderer

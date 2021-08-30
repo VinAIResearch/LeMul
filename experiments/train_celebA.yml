@@ -1,9 +1,9 @@
-## train multi-PIE
+## train celeba
 
 run_train: true
 num_epochs: 20
-batch_size: 24
-checkpoint_dir: results/multiPIE
+batch_size: 32
+checkpoint_dir: results/celeba
 save_checkpoint_freq: 1
 keep_num_checkpoint: 2
 resume: true
@@ -14,10 +14,10 @@ log_freq: 100
 num_workers: 4
 image_size: 64
 load_gt_depth: false
-train_val_data_dir: data/pie_full
+train_val_data_dir: data/img_celeba_cropped
 
 ## model
-model_name: lemul_multiPIE
+model_name: lemul_celeba
 min_depth: 0.9
 max_depth: 1.1
 xyz_rotation_range: 60  # (-r,r) in degrees
