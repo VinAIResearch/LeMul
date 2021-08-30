@@ -58,27 +58,35 @@ def make_dataset(dir):
     images = []
 
     '''PIE'''
-    session_list = os.listdir(dir)
-    for session in session_list:
-        object_list = os.listdir(os.path.join(dir, session))
-        for object in object_list:
-            expression_list = os.listdir(os.path.join(dir, session, object))
-            for expression in expression_list:
-                left_list = os.listdir(os.path.join(dir, session, object, expression, '13_0'))
-                frontal_list = os.listdir(os.path.join(dir, session, object, expression, '05_1'))
-                right_list = os.listdir(os.path.join(dir, session, object, expression, '04_1'))
+    if 'pie' in dir: # To be changed
+        session_list = os.listdir(dir)
+        for session in session_list:
+            object_list = os.listdir(os.path.join(dir, session))
+            for object in object_list:
+                expression_list = os.listdir(os.path.join(dir, session, object))
+                for expression in expression_list:
+                    left_list = os.listdir(os.path.join(dir, session, object, expression, '13_0'))
+                    frontal_list = os.listdir(os.path.join(dir, session, object, expression, '05_1'))
+                    right_list = os.listdir(os.path.join(dir, session, object, expression, '04_1'))
 
 
-                for i in range(rand_num):
-                    left = random.choice(left_list)
-                    frontal = random.choice(frontal_list)
-                    right = random.choice(right_list)
+                    for i in range(rand_num):
+                        left = random.choice(left_list)
+                        frontal = random.choice(frontal_list)
+                        right = random.choice(right_list)
 
-                    left_path = os.path.join(dir, session, object, expression, '13_0', left)
-                    frontal_path = os.path.join(dir, session, object, expression, '05_1', frontal)
-                    right_path = os.path.join(dir, session, object, expression, '04_1', right)
-                    images.append([frontal_path, right_path])
-                    images.append([frontal_path, left_path])
+                        left_path = os.path.join(dir, session, object, expression, '13_0', left)
+                        frontal_path = os.path.join(dir, session, object, expression, '05_1', frontal)
+                        right_path = os.path.join(dir, session, object, expression, '04_1', right)
+                        images.append([frontal_path, right_path])
+                        images.append([frontal_path, left_path])
+
+    else:
+        for root, _, fnames in sorted(os.walk(dir)):
+            for fname in sorted(fnames):
+                if is_image_file(fname):
+                    fpath = os.path.join(root, fname)
+                    images.append([fpath, fpath])
 
     random.shuffle(images)
     return images
@@ -100,7 +108,8 @@ class ImageDataset(torch.utils.data.Dataset):
     def transform(self, imgs):
         img1 = tfs.functional.resize(imgs[0], (self.image_size, self.image_size))
         img2 = tfs.functional.resize(imgs[1], (self.image_size, self.image_size))
-
+        if 'pie' not in self.root:
+            img2 = tfs.functional.hflip(img2)
         img1_tensor = tfs.functional.to_tensor(img1)
         img2_tensor = tfs.functional.to_tensor(img2)
 
