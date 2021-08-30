@@ -1,21 +1,23 @@
 import argparse
-import numpy as np
-from PIL import Image
-import torch
-import torch.nn as nn
-from utils import *
 import os
 import sys
+
+import numpy as np
+import torch
+import torch.nn as nn
+from PIL import Image
+from utils import EDDeconv, Encoder, export_to_obj_string, get_grid, is_image_file, save_image, save_video
+
 
 sys.path.insert(0, "./")
 
 EPS = 1e-7
 
 
-class Demo():
+class Demo:
     def __init__(self, args):
-        ## configs
-        self.device = 'cuda:0' if args.gpu else 'cpu'
+        # configs
+        self.device = "cuda:0" if args.gpu else "cpu"
         self.checkpoint_path = args.checkpoint
         self.render_video = args.render_video
         self.output_size = args.output_size
@@ -28,23 +30,22 @@ class Demo():
         self.z_translation_range = 0
         self.fov = 10  # in degrees
 
-        self.depth_rescaler = lambda d: (1 + d) / 2 * self.max_depth + (
-                    1 - d) / 2 * self.min_depth  # (-1,1) => (min_depth,max_depth)
+        self.depth_rescaler = (
+            lambda d: (1 + d) / 2 * self.max_depth + (1 - d) / 2 * self.min_depth
+        )  # (-1,1) => (min_depth,max_depth)
         self.depth_inv_rescaler = lambda d: (d - self.min_depth) / (
-                    self.max_depth - self.min_depth)  # (min_depth,max_depth) => (0,1)
+            self.max_depth - self.min_depth
+        )  # (min_depth,max_depth) => (0,1)
 
         fx = (self.image_size - 1) / 2 / (np.tan(self.fov / 2 * np.pi / 180))
         fy = (self.image_size - 1) / 2 / (np.tan(self.fov / 2 * np.pi / 180))
         cx = (self.image_size - 1) / 2
         cy = (self.image_size - 1) / 2
-        K = [[fx, 0., cx],
-             [0., fy, cy],
-             [0., 0., 1.]]
+        K = [[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]]
         K = torch.FloatTensor(K).to(self.device)
         self.inv_K = torch.inverse(K).unsqueeze(0)
         self.K = K.unsqueeze(0)
 
-        ## NN models
         self.netD = EDDeconv(cin=3, cout=1, nf=64, zdim=256, activation=None)
         self.netA = EDDeconv(cin=3, cout=3, nf=64, zdim=256)
         self.netL = Encoder(cin=3, cout=4, nf=32)
@@ -61,26 +62,29 @@ class Demo():
         self.netL.eval()
         self.netV.eval()
 
-        ## renderer
+        # renderer
         if self.render_video:
-            from unsup3d.renderer import Renderer
-            assert 'cuda' in self.device, 'A GPU device is required for rendering because the neural_renderer only has GPU implementation.'
+            from renderer.renderer import Renderer
+
+            assert (
+                "cuda" in self.device
+            ), "A GPU device is required for rendering because the neural_renderer only has GPU implementation."
             cfgs = {
-                'device': self.device,
-                'image_size': self.output_size,
-                'min_depth': self.min_depth,
-                'max_depth': self.max_depth,
-                'fov': self.fov,
+                "device": self.device,
+                "image_size": self.output_size,
+                "min_depth": self.min_depth,
+                "max_depth": self.max_depth,
+                "fov": self.fov,
             }
             self.renderer = Renderer(cfgs)
 
     def load_checkpoint(self):
         print(f"Loading checkpoint from {self.checkpoint_path}")
         cp = torch.load(self.checkpoint_path, map_location=self.device)
-        self.netD.load_state_dict(cp['netD'])
-        self.netA.load_state_dict(cp['netA'])
-        self.netL.load_state_dict(cp['netL'])
-        self.netV.load_state_dict(cp['netV'])
+        self.netD.load_state_dict(cp["netD"])
+        self.netA.load_state_dict(cp["netA"])
+        self.netL.load_state_dict(cp["netL"])
+        self.netV.load_state_dict(cp["netV"])
 
     def depth_to_3d_grid(self, depth, inv_K=None):
         if inv_K is None:
@@ -110,164 +114,193 @@ class Demo():
         im = np.uint8(pil_im)
 
         h, w, _ = im.shape
-        im = torch.FloatTensor(im / 255.).permute(2, 0, 1).unsqueeze(0)
+        im = torch.FloatTensor(im / 255.0).permute(2, 0, 1).unsqueeze(0)
         # resize to 128 first if too large, to avoid bilinear downsampling artifacts
         if h > self.image_size * 4 and w > self.image_size * 4:
-            im = nn.functional.interpolate(im, (self.image_size * 2, self.image_size * 2), mode='bilinear',
-                                           align_corners=False)
-        im = nn.functional.interpolate(im, (self.image_size, self.image_size), mode='bilinear', align_corners=False)
+            im = nn.functional.interpolate(
+                im, (self.image_size * 2, self.image_size * 2), mode="bilinear", align_corners=False
+            )
+        im = nn.functional.interpolate(im, (self.image_size, self.image_size), mode="bilinear", align_corners=False)
 
         with torch.no_grad():
-            self.input_im = im.to(self.device) * 2. - 1.
+            self.input_im = im.to(self.device) * 2.0 - 1.0
             b, c, h, w = self.input_im.shape
 
-            ## predict canonical depth
+            # predict canonical depth
             self.canon_depth_raw = self.netD(self.input_im).squeeze(1)  # BxHxW
             self.canon_depth = self.canon_depth_raw - self.canon_depth_raw.view(b, -1).mean(1).view(b, 1, 1)
             self.canon_depth = self.canon_depth.tanh()
             self.canon_depth = self.depth_rescaler(self.canon_depth)
 
-            ## clamp border depth
+            # clamp border depth
             depth_border = torch.zeros(1, h, w - 4).to(self.input_im.device)
-            depth_border = nn.functional.pad(depth_border, (2, 2), mode='constant', value=1)
+            depth_border = nn.functional.pad(depth_border, (2, 2), mode="constant", value=1)
             self.canon_depth = self.canon_depth * (1 - depth_border) + depth_border * self.border_depth
 
-            ## predict canonical albedo
+            # predict canonical albedo
             self.canon_albedo = self.netA(self.input_im)  # Bx3xHxW
 
-            ## predict lighting
+            # predict lighting
             canon_light = self.netL(self.input_im)  # Bx4
             self.canon_light_a = canon_light[:, :1] / 2 + 0.5  # ambience term
             self.canon_light_b = canon_light[:, 1:2] / 2 + 0.5  # diffuse term
             canon_light_dxy = canon_light[:, 2:]
             self.canon_light_d = torch.cat([canon_light_dxy, torch.ones(b, 1).to(self.input_im.device)], 1)
-            self.canon_light_d = self.canon_light_d / (
-                (self.canon_light_d ** 2).sum(1, keepdim=True)) ** 0.5  # diffuse light direction
+            self.canon_light_d = (
+                self.canon_light_d / ((self.canon_light_d ** 2).sum(1, keepdim=True)) ** 0.5
+            )  # diffuse light direction
 
-            ## shading
+            # shading
             self.canon_normal = self.get_normal_from_depth(self.canon_depth)
-            self.canon_diffuse_shading = (self.canon_normal * self.canon_light_d.view(-1, 1, 1, 3)).sum(3).clamp(
-                min=0).unsqueeze(1)
-            canon_shading = self.canon_light_a.view(-1, 1, 1, 1) + self.canon_light_b.view(-1, 1, 1,
-                                                                                           1) * self.canon_diffuse_shading
+            self.canon_diffuse_shading = (
+                (self.canon_normal * self.canon_light_d.view(-1, 1, 1, 3)).sum(3).clamp(min=0).unsqueeze(1)
+            )
+            canon_shading = (
+                self.canon_light_a.view(-1, 1, 1, 1)
+                + self.canon_light_b.view(-1, 1, 1, 1) * self.canon_diffuse_shading
+            )
             self.canon_im = (self.canon_albedo / 2 + 0.5) * canon_shading * 2 - 1
 
-            ## predict viewpoint transformation
+            # predict viewpoint transformation
             self.view = self.netV(self.input_im)
-            self.view = torch.cat([
-                self.view[:, :3] * np.pi / 180 * self.xyz_rotation_range,
-                self.view[:, 3:5] * self.xy_translation_range,
-                self.view[:, 5:] * self.z_translation_range], 1)
+            self.view = torch.cat(
+                [
+                    self.view[:, :3] * np.pi / 180 * self.xyz_rotation_range,
+                    self.view[:, 3:5] * self.xy_translation_range,
+                    self.view[:, 5:] * self.z_translation_range,
+                ],
+                1,
+            )
 
-            ## export to obj strings
+            # export to obj strings
             vertices = self.depth_to_3d_grid(self.canon_depth)  # BxHxWx3
             self.objs, self.mtls = export_to_obj_string(vertices, self.canon_normal)
 
-            ## resize to output size
-            self.canon_depth = nn.functional.interpolate(self.canon_depth.unsqueeze(1),
-                                                         (self.output_size, self.output_size), mode='bilinear',
-                                                         align_corners=False).squeeze(1)
-            self.canon_normal = nn.functional.interpolate(self.canon_normal.permute(0, 3, 1, 2),
-                                                          (self.output_size, self.output_size), mode='bilinear',
-                                                          align_corners=False).permute(0, 2, 3, 1)
+            # resize to output size
+            self.canon_depth = nn.functional.interpolate(
+                self.canon_depth.unsqueeze(1),
+                (self.output_size, self.output_size),
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(1)
+            self.canon_normal = nn.functional.interpolate(
+                self.canon_normal.permute(0, 3, 1, 2),
+                (self.output_size, self.output_size),
+                mode="bilinear",
+                align_corners=False,
+            ).permute(0, 2, 3, 1)
             self.canon_normal = self.canon_normal / (self.canon_normal ** 2).sum(3, keepdim=True) ** 0.5
-            self.canon_diffuse_shading = nn.functional.interpolate(self.canon_diffuse_shading,
-                                                                   (self.output_size, self.output_size),
-                                                                   mode='bilinear', align_corners=False)
-            self.canon_albedo = nn.functional.interpolate(self.canon_albedo, (self.output_size, self.output_size),
-                                                          mode='bilinear', align_corners=False)
-            self.canon_im = nn.functional.interpolate(self.canon_im, (self.output_size, self.output_size),
-                                                      mode='bilinear', align_corners=False)
+            self.canon_diffuse_shading = nn.functional.interpolate(
+                self.canon_diffuse_shading, (self.output_size, self.output_size), mode="bilinear", align_corners=False
+            )
+            self.canon_albedo = nn.functional.interpolate(
+                self.canon_albedo, (self.output_size, self.output_size), mode="bilinear", align_corners=False
+            )
+            self.canon_im = nn.functional.interpolate(
+                self.canon_im, (self.output_size, self.output_size), mode="bilinear", align_corners=False
+            )
 
             if self.render_video:
                 self.render_animation()
 
     def render_animation(self):
-        print(f"Rendering video animations")
+        print("Rendering video animations")
         b, h, w = self.canon_depth.shape
 
-        ## morph from target view to canonical
+        # morph from target view to canonical
         morph_frames = 15
         view_zero = torch.FloatTensor([0.15 * np.pi / 180 * 60, 0, 0, 0, 0, 0]).to(self.canon_depth.device)
         morph_s = torch.linspace(0, 1, morph_frames).to(self.canon_depth.device)
         view_morph = morph_s.view(-1, 1, 1) * view_zero.view(1, 1, -1) + (
-                    1 - morph_s.view(-1, 1, 1)) * self.view.unsqueeze(0)  # TxBx6
+            1 - morph_s.view(-1, 1, 1)
+        ) * self.view.unsqueeze(
+            0
+        )  # TxBx6
 
-        ## yaw from canonical to both sides
+        # yaw from canonical to both sides
         yaw_frames = 80
         yaw_rotations = np.linspace(-np.pi / 2, np.pi / 2, yaw_frames)
         # yaw_rotations = np.concatenate([yaw_rotations[40:], yaw_rotations[::-1], yaw_rotations[:40]], 0)
 
-        ## whole rotation sequence
+        # whole rotation sequence
         view_after = torch.cat([view_morph, view_zero.repeat(yaw_frames, b, 1)], 0)
         yaw_rotations = np.concatenate([np.zeros(morph_frames), yaw_rotations], 0)
 
         def rearrange_frames(frames):
             morph_seq = frames[:, :morph_frames]
             yaw_seq = frames[:, morph_frames:]
-            out_seq = torch.cat([
-                morph_seq[:, :1].repeat(1, 5, 1, 1, 1),
-                morph_seq,
-                morph_seq[:, -1:].repeat(1, 5, 1, 1, 1),
-                yaw_seq[:, yaw_frames // 2:],
-                yaw_seq.flip(1),
-                yaw_seq[:, :yaw_frames // 2],
-                morph_seq[:, -1:].repeat(1, 5, 1, 1, 1),
-                morph_seq.flip(1),
-                morph_seq[:, :1].repeat(1, 5, 1, 1, 1),
-            ], 1)
+            out_seq = torch.cat(
+                [
+                    morph_seq[:, :1].repeat(1, 5, 1, 1, 1),
+                    morph_seq,
+                    morph_seq[:, -1:].repeat(1, 5, 1, 1, 1),
+                    yaw_seq[:, yaw_frames // 2 :],
+                    yaw_seq.flip(1),
+                    yaw_seq[:, : yaw_frames // 2],
+                    morph_seq[:, -1:].repeat(1, 5, 1, 1, 1),
+                    morph_seq.flip(1),
+                    morph_seq[:, :1].repeat(1, 5, 1, 1, 1),
+                ],
+                1,
+            )
             return out_seq
 
-        ## textureless shape
+        # textureless shape
         front_light = torch.FloatTensor([0, 0, 1]).to(self.canon_depth.device)
         canon_shape_im = (self.canon_normal * front_light.view(1, 1, 1, 3)).sum(3).clamp(min=0).unsqueeze(1)
         canon_shape_im = canon_shape_im.repeat(1, 3, 1, 1) * 0.7
-        shape_animation = self.renderer.render_yaw(canon_shape_im, self.canon_depth, v_after=view_after,
-                                                   rotations=yaw_rotations)  # BxTxCxHxW
+        shape_animation = self.renderer.render_yaw(
+            canon_shape_im, self.canon_depth, v_after=view_after, rotations=yaw_rotations
+        )  # BxTxCxHxW
         self.shape_animation = rearrange_frames(shape_animation)
 
-        ## normal map
+        # normal map
         canon_normal_im = self.canon_normal.permute(0, 3, 1, 2) / 2 + 0.5
-        normal_animation = self.renderer.render_yaw(canon_normal_im, self.canon_depth, v_after=view_after,
-                                                    rotations=yaw_rotations)  # BxTxCxHxW
+        normal_animation = self.renderer.render_yaw(
+            canon_normal_im, self.canon_depth, v_after=view_after, rotations=yaw_rotations
+        )  # BxTxCxHxW
         self.normal_animation = rearrange_frames(normal_animation)
 
-        ## textured
-        texture_animation = self.renderer.render_yaw(self.canon_im / 2 + 0.5, self.canon_depth, v_after=view_after,
-                                                     rotations=yaw_rotations)  # BxTxCxHxW
+        # textured
+        texture_animation = self.renderer.render_yaw(
+            self.canon_im / 2 + 0.5, self.canon_depth, v_after=view_after, rotations=yaw_rotations
+        )  # BxTxCxHxW
         self.texture_animation = rearrange_frames(texture_animation)
 
     def save_results(self, save_dir):
         print(f"Saving results to {save_dir}")
-        save_image(save_dir, self.input_im[0] / 2 + 0.5, 'input_image')
-        save_image(save_dir, self.depth_inv_rescaler(self.canon_depth)[0].repeat(3, 1, 1), 'canonical_depth')
-        save_image(save_dir, self.canon_normal[0].permute(2, 0, 1) / 2 + 0.5, 'canonical_normal')
-        save_image(save_dir, self.canon_diffuse_shading[0].repeat(3, 1, 1), 'canonical_diffuse_shading')
-        save_image(save_dir, self.canon_albedo[0] / 2 + 0.5, 'canonical_albedo')
-        save_image(save_dir, self.canon_im[0].clamp(-1, 1) / 2 + 0.5, 'canonical_image')
+        save_image(save_dir, self.input_im[0] / 2 + 0.5, "input_image")
+        save_image(save_dir, self.depth_inv_rescaler(self.canon_depth)[0].repeat(3, 1, 1), "canonical_depth")
+        save_image(save_dir, self.canon_normal[0].permute(2, 0, 1) / 2 + 0.5, "canonical_normal")
+        save_image(save_dir, self.canon_diffuse_shading[0].repeat(3, 1, 1), "canonical_diffuse_shading")
+        save_image(save_dir, self.canon_albedo[0] / 2 + 0.5, "canonical_albedo")
+        save_image(save_dir, self.canon_im[0].clamp(-1, 1) / 2 + 0.5, "canonical_image")
 
-        with open(os.path.join(save_dir, 'result.mtl'), "w") as f:
-            f.write(self.mtls[0].replace('$TXTFILE', './canonical_image.png'))
-        with open(os.path.join(save_dir, 'result.obj'), "w") as f:
-            f.write(self.objs[0].replace('$MTLFILE', './result.mtl'))
+        with open(os.path.join(save_dir, "result.mtl"), "w") as f:
+            f.write(self.mtls[0].replace("$TXTFILE", "./canonical_image.png"))
+        with open(os.path.join(save_dir, "result.obj"), "w") as f:
+            f.write(self.objs[0].replace("$MTLFILE", "./result.mtl"))
 
         if self.render_video:
-            save_video(save_dir, self.shape_animation[0], 'shape_animation')
-            save_video(save_dir, self.normal_animation[0], 'normal_animation')
-            save_video(save_dir, self.texture_animation[0], 'texture_animation')
+            save_video(save_dir, self.shape_animation[0], "shape_animation")
+            save_video(save_dir, self.normal_animation[0], "normal_animation")
+            save_video(save_dir, self.texture_animation[0], "texture_animation")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Demo configurations.')
-    parser.add_argument('--input', default='./demo/vinai', type=str,
-                        help='Path to the directory containing input images')
-    parser.add_argument('--result', default='./demo/results_vinai', type=str,
-                        help='Path to the directory for saving results')
-    parser.add_argument('--checkpoint', default='./pretrained/checkpoint010.pth', type=str,
-                        help='Path to the checkpoint file')
-    parser.add_argument('--output_size', default=128, type=int, help='Output image size')
-    parser.add_argument('--gpu', default=True, action='store_true', help='Enable GPU')
-    parser.add_argument('--render_video', default=False, action='store_true', help='Render 3D animations to video')
+    parser = argparse.ArgumentParser(description="Demo configurations.")
+    parser.add_argument(
+        "--input", default="./demo/vinai", type=str, help="Path to the directory containing input images"
+    )
+    parser.add_argument(
+        "--result", default="./demo/results_vinai", type=str, help="Path to the directory for saving results"
+    )
+    parser.add_argument(
+        "--checkpoint", default="./pretrained/checkpoint010.pth", type=str, help="Path to the checkpoint file"
+    )
+    parser.add_argument("--output_size", default=128, type=int, help="Output image size")
+    parser.add_argument("--gpu", default=True, action="store_true", help="Enable GPU")
+    parser.add_argument("--render_video", default=False, action="store_true", help="Render 3D animations to video")
     args = parser.parse_args()
 
     input_dir = args.input
@@ -277,7 +310,7 @@ if __name__ == "__main__":
 
     for im_path in im_list:
         print(f"Processing {im_path}")
-        pil_im = Image.open(im_path).convert('RGB')
+        pil_im = Image.open(im_path).convert("RGB")
         result_code = model.run(pil_im)
         if result_code == -1:
             print(f"Failed! Skipping {im_path}")

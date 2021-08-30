@@ -1,20 +1,21 @@
-import os
-import json
-import time
-import torch
-import matplotlib.pyplot as plt
 import collections
+import json
+import os
+import time
+
+import matplotlib.pyplot as plt
+import torch
 from utils import xmkdir
 
 
-class TotalAverage():
+class TotalAverage:
     def __init__(self):
         self.reset()
 
     def reset(self):
-        self.last_value = 0.
-        self.mass = 0.
-        self.sum = 0.
+        self.last_value = 0.0
+        self.mass = 0.0
+        self.sum = 0.0
 
     def update(self, value, mass=1):
         self.last_value = value
@@ -24,7 +25,8 @@ class TotalAverage():
     def get(self):
         return self.sum / self.mass
 
-class MovingAverage():
+
+class MovingAverage:
     def __init__(self, inertia=0.9):
         self.inertia = inertia
         self.reset()
@@ -44,7 +46,8 @@ class MovingAverage():
     def get(self):
         return self.average
 
-class MetricsTrace():
+
+class MetricsTrace:
     def __init__(self):
         self.reset()
 
@@ -58,7 +61,7 @@ class MetricsTrace():
 
     def load(self, path):
         """Load the metrics trace from the specified JSON file."""
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             self.data = json.load(f)
 
     def save(self, path):
@@ -66,7 +69,7 @@ class MetricsTrace():
         if path is None:
             return
         xmkdir(os.path.dirname(path))
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(self.data, f, indent=2)
 
     def plot(self, pdf_path=None):
@@ -79,7 +82,8 @@ class MetricsTrace():
     def __str__(self):
         pass
 
-class Metrics():
+
+class Metrics:
     def __init__(self):
         self.iteration_time = MovingAverage(inertia=0.9)
         self.now = time.time()
@@ -89,7 +93,8 @@ class Metrics():
         self.now = time.time()
 
     def get_data_dict(self):
-        return {"objective" : self.objective.get(), "iteration_time" : self.iteration_time.get()}
+        return {"objective": self.objective.get(), "iteration_time": self.iteration_time.get()}
+
 
 class StandardMetrics(Metrics):
     def __init__(self, m=None):
@@ -108,14 +113,15 @@ class StandardMetrics(Metrics):
         self.speed.update(mass / self.iteration_time.last_value)
 
     def get_data_dict(self):
-        data_dict = {k: v.get() for k,v in self.metrics.items()}
-        data_dict['speed'] = self.speed.get()
+        data_dict = {k: v.get() for k, v in self.metrics.items()}
+        data_dict["speed"] = self.speed.get()
         return data_dict
 
     def __str__(self):
-        pstr = '%7.1fHz\t' %self.speed.get()
-        pstr += '\t'.join(['%s: %6.5f' %(k,v.get()) for k,v in self.metrics.items()])
+        pstr = "%7.1fHz\t" % self.speed.get()
+        pstr += "\t".join(["%s: %6.5f" % (k, v.get()) for k, v in self.metrics.items()])
         return pstr
+
 
 def plot_metrics(stats, pdf_path=None, fig=1, datasets=None, metrics=None):
     """Plot metrics. `stats` should be a dictionary of type
@@ -137,14 +143,14 @@ def plot_metrics(stats, pdf_path=None, fig=1, datasets=None, metrics=None):
     """
     plt.figure(fig)
     plt.clf()
-    linestyles = ['-', '--', '-.', ':']
+    linestyles = ["-", "--", "-.", ":"]
     datasets = list(stats.keys()) if datasets is None else datasets
     # Filter out empty datasets
     datasets = [d for d in datasets if len(stats[d]) > 0]
     duration = len(stats[datasets[0]])
     metrics = list(stats[datasets[0]][0].keys()) if metrics is None else metrics
     for m, metric in enumerate(metrics):
-        plt.subplot(len(metrics),1,m+1)
+        plt.subplot(len(metrics), 1, m + 1)
         legend_content = []
         for d, dataset in enumerate(datasets):
             ls = linestyles[d % len(linestyles)]
@@ -153,16 +159,16 @@ def plot_metrics(stats, pdf_path=None, fig=1, datasets=None, metrics=None):
                 for sl in range(metric_dimension):
                     x = [stats[dataset][t][metric][sl] for t in range(duration)]
                     plt.plot(x, linestyle=ls)
-                    name = f'{dataset} {metric}[{sl}]'
+                    name = f"{dataset} {metric}[{sl}]"
                     legend_content.append(name)
             else:
                 x = [stats[dataset][t][metric] for t in range(duration)]
                 plt.plot(x, linestyle=ls)
-                name = f'{dataset} {metric}'
+                name = f"{dataset} {metric}"
                 legend_content.append(name)
-        plt.legend(legend_content, loc=(1.04,0))
+        plt.legend(legend_content, loc=(1.04, 0))
         plt.grid(True)
     if pdf_path is not None:
-        plt.savefig(pdf_path, format='pdf', bbox_inches='tight')
+        plt.savefig(pdf_path, format="pdf", bbox_inches="tight")
     plt.draw()
     plt.pause(0.0001)
