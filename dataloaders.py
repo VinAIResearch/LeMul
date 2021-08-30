@@ -26,8 +26,8 @@ def get_data_loaders(cfgs):
         get_loader = lambda **kargs: get_image_loader(**kargs, batch_size=batch_size, image_size=image_size, crop=crop)
 
     if run_train:
-        train_data_dir = os.path.join(train_val_data_dir)
-        val_data_dir = os.path.join(train_val_data_dir)
+        train_data_dir = os.path.join(train_val_data_dir, "train")
+        val_data_dir = os.path.join(train_val_data_dir, "val")
         assert os.path.isdir(train_data_dir), "Training data directory does not exist: %s" %train_data_dir
         assert os.path.isdir(val_data_dir), "Validation data directory does not exist: %s" %val_data_dir
         print(f"Loading training data from {train_data_dir}")

@@ -24,8 +24,6 @@ class LeMul():
         self.xy_translation_range = cfgs.get('xy_translation_range', 0.1)
         self.z_translation_range = cfgs.get('z_translation_range', 0.1)
         self.lam_perc = cfgs.get('lam_perc', 1)
-        self.lam_flip = cfgs.get('lam_flip', 0.5)
-        self.lam_flip_start_epoch = cfgs.get('lam_flip_start_epoch', 0)
         self.lr = cfgs.get('lr', 1e-4)
         self.load_gt_depth = cfgs.get('load_gt_depth', False)
         self.renderer = Renderer(cfgs)
@@ -295,7 +293,8 @@ class LeMul():
         '''Tai tao lai '''
         _, _, self.recon_flip_from_im, recon_depth_flip_from_im, _, canon_im_flip_from_im, _, _, recon_im_mask_both_flip_from_im, recon_albedo_flip_from_im = self.render(
             self.canon_albedo, self.canon_depth, self.canon_light_flip, self.view_flip)
-        conf_sigma_l1_norm_flip, conf_sigma_percl_norm_flip = self.netC2(torch.cat((self.input_im, self.input_im_flip), 1))  # Bx1xHxW
+        conf_sigma_l1_norm_flip, conf_sigma_percl_norm_flip = self.netC2(
+            torch.cat((self.input_im, self.input_im_flip), 1))  # Bx1xHxW
         _, _, _, self.loss_flip_from_im = self.loss(self.recon_flip_from_im, self.input_im_flip,
                                                     recon_albedo=recon_albedo_flip_from_im,
                                                     recon_depth=recon_depth_flip_from_im,
@@ -313,7 +312,6 @@ class LeMul():
                                                     recon_im_mask_both=recon_im_mask_both_from_flip,
                                                     conf_sigma_l1=conf_sigma_l1_norm_im,
                                                     conf_sigma_percl=conf_sigma_percl_norm_im)
-
 
         self.albedo_loss = albedo_loss
         self.flip_depth_loss = torch.abs(self.canon_depth - self.canon_depth_flip).sum()
@@ -394,13 +392,6 @@ class LeMul():
 
         ## write summary
         logger.add_scalar('Loss/loss_total', self.loss_total, total_iter)
-        logger.add_scalar('Loss/loss', self.loss_im, total_iter)
-        logger.add_scalar('Loss/loss_flip', self.loss_im_flip, total_iter)
-        logger.add_scalar('Loss/loss_flip_from_im', self.loss_flip_from_im, total_iter)
-        logger.add_scalar('Loss/loss_im_from_flip', self.loss_im_from_flip, total_iter)
-        logger.add_scalar('Loss/loss_albedo', self.albedo_loss, total_iter)
-        logger.add_scalar('Loss/loss_flip_depth', self.flip_depth_loss, total_iter)
-        logger.add_scalar('Loss/loss_flip_albedo', self.flip_albedo_loss, total_iter)
 
         logger.add_histogram('Depth/canon_depth_raw_hist', canon_depth_raw_hist, total_iter)
         vlist = ['view_rx', 'view_ry', 'view_rz', 'view_tx', 'view_ty', 'view_tz']
