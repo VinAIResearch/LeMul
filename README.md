@@ -1,4 +1,4 @@
-# Toward Realistic Single-View 3D Object Reconstruction with Unsupervised Learning from Multiple Images - ICCV 2021
+# Toward Realistic Single-View 3D Object Reconstruction with Unsupervised Learning from Multiple Images
 
 We propose a more general framework, called LeMul, that effectively Learns from Multi-image datasets for more flexible and reliable unsupervised training of 3D reconstruction networks. It employs loose shape and texture consistency losses based on component swapping across views.
 
