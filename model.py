@@ -124,7 +124,6 @@ class LeMul():
         return loss
 
     def cal_albedo_loss(self, input_im, recon_depth, recon_albedo, mask=None):
-        '''====> Albedo gradient loss (window size: 5x5)'''
         # ========================================= #
         threshold = 0.5
         variance_c_square = 0.05
@@ -188,7 +187,6 @@ class LeMul():
     def render(self, canon_albedo, canon_depth, canon_light, view):
         b = canon_albedo.shape[0]
 
-        # xu ly light ne
         canon_light_a = canon_light[:, :1] / 2 + 0.5  # ambience term
         canon_light_b = canon_light[:, 1:2] / 2 + 0.5  # diffuse term
         canon_light_dxy = canon_light[:, 2:]
@@ -196,13 +194,11 @@ class LeMul():
         canon_light_d = canon_light_d / (
             (canon_light_d ** 2).sum(1, keepdim=True)) ** 0.5  # diffuse light direction
 
-        # shading
         canon_normal = self.renderer.get_normal_from_depth(canon_depth)
         canon_diffuse_shading = (canon_normal * canon_light_d.view(-1, 1, 1, 3)).sum(3).clamp(min=0).unsqueeze(1)
         canon_shading = canon_light_a.view(-1, 1, 1, 1) + canon_light_b.view(-1, 1, 1, 1) * canon_diffuse_shading
         canon_im = (canon_albedo / 2 + 0.5) * canon_shading * 2 - 1
 
-        ## reconstruct input view
         self.renderer.set_transform_matrices(view)
         recon_depth = self.renderer.warp_canon_depth(canon_depth)
         recon_normal = self.renderer.get_normal_from_depth(recon_depth)
@@ -272,52 +268,45 @@ class LeMul():
 
     def forward(self, input):
         if self.load_gt_depth:
-            input, input_flip, depth_gt = input
+            input, input_support, depth_gt = input
         else:
-            input, input_flip = input
+            input, input_support = input
 
         self.input_im = input.to(self.device) * 2. - 1.
-        self.input_im_flip = input_flip.to(self.device) * 2. - 1.
+        self.input_im_support = input_support.to(self.device) * 2. - 1.
         b, c, h, w = self.input_im.shape
 
-        '''Process Im ne'''
         self.view, self.canon_depth_raw, self.canon_diffuse_shading, self.canon_albedo, self.recon_im, self.recon_depth, self.recon_normal, self.canon_im, self.canon_depth, self.canon_normal, self.conf_sigma_l1, \
         self.conf_sigma_percl, self.canon_light, recon_im_mask, recon_im_mask_both, loss_l1_im, loss_perc_im, albedo_loss, self.loss_im, self.recon_albedo = self.process(
             self.input_im)
 
-        '''Process Im_flip ne'''
-        self.view_flip, self.canon_depth_raw_flip, self.canon_diffuse_shading_flip, self.canon_albedo_flip, self.recon_im_flip, self.recon_depth_flip, self.recon_normal_flip, self.canon_im_flip, self.canon_depth_flip, self.canon_normal_flip, self.conf_sigma_l1_flip, \
-        self.conf_sigma_percl_flip, self.canon_light_flip, recon_im_mask_flip, recon_im_mask_both_flip, loss_l1_im_flip, loss_perc_im_flip, albedo_loss_flip, self.loss_im_flip, self.recon_albedo_flip = self.process(
-            self.input_im_flip)
+        self.view_support, self.canon_depth_raw_support, self.canon_diffuse_shading_support, self.canon_albedo_support, self.recon_im_support, self.recon_depth_support, self.recon_normal_support, self.canon_im_support, self.canon_depth_support, self.canon_normal_support, self.conf_sigma_l1_support, \
+        self.conf_sigma_percl_support, self.canon_light_support, recon_im_mask_support, recon_im_mask_both_support, loss_l1_im_support, loss_perc_im_support, albedo_loss_support, self.loss_im_support, self.recon_albedo_support = self.process(
+            self.input_im_support)
 
-        '''Tai tao lai '''
-        _, _, self.recon_flip_from_im, recon_depth_flip_from_im, _, canon_im_flip_from_im, _, _, recon_im_mask_both_flip_from_im, recon_albedo_flip_from_im = self.render(
-            self.canon_albedo, self.canon_depth, self.canon_light_flip, self.view_flip)
-        conf_sigma_l1_norm_flip, conf_sigma_percl_norm_flip = self.netC2(
-            torch.cat((self.input_im, self.input_im_flip), 1))  # Bx1xHxW
-        _, _, _, self.loss_flip_from_im = self.loss(self.recon_flip_from_im, self.input_im_flip,
-                                                    recon_albedo=recon_albedo_flip_from_im,
-                                                    recon_depth=recon_depth_flip_from_im,
-                                                    recon_im_mask_both=recon_im_mask_both_flip_from_im,
-                                                    conf_sigma_l1=conf_sigma_l1_norm_flip,
-                                                    conf_sigma_percl=conf_sigma_percl_norm_flip)
+        _, _, self.recon_support_from_im, recon_depth_support_from_im, _, canon_im_support_from_im, _, _, recon_im_mask_both_support_from_im, recon_albedo_support_from_im = self.render(
+            self.canon_albedo, self.canon_depth, self.canon_light_support, self.view_support)
+        conf_sigma_l1_norm_support, conf_sigma_percl_norm_support = self.netC2(
+            torch.cat((self.input_im, self.input_im_support), 1))  # Bx1xHxW
+        _, _, _, self.loss_support_from_im = self.loss(self.recon_support_from_im, self.input_im_support,
+                                                    recon_albedo=recon_albedo_support_from_im,
+                                                    recon_depth=recon_depth_support_from_im,
+                                                    recon_im_mask_both=recon_im_mask_both_support_from_im,
+                                                    conf_sigma_l1=conf_sigma_l1_norm_support,
+                                                    conf_sigma_percl=conf_sigma_percl_norm_support)
 
-        _, _, self.recon_im_from_flip, recon_depth_im_from_flip, _, canon_im_from_flip, _, _, recon_im_mask_both_from_flip, recon_albedo_im_from_flip = self.render(
-            self.canon_albedo_flip, self.canon_depth_flip, self.canon_light, self.view)
+        _, _, self.recon_im_from_support, recon_depth_im_from_support, _, canon_im_from_support, _, _, recon_im_mask_both_from_support, recon_albedo_im_from_support = self.render(
+            self.canon_albedo_support, self.canon_depth_support, self.canon_light, self.view)
         conf_sigma_l1_norm_im, conf_sigma_percl_norm_im = self.netC2(
-            torch.cat((self.input_im_flip, self.input_im), 1))  # Bx1xHxW
-        _, _, _, self.loss_im_from_flip = self.loss(self.recon_im_from_flip, self.input_im,
-                                                    recon_albedo=recon_albedo_im_from_flip,
-                                                    recon_depth=recon_depth_im_from_flip,
-                                                    recon_im_mask_both=recon_im_mask_both_from_flip,
+            torch.cat((self.input_im_support, self.input_im), 1))  # Bx1xHxW
+        _, _, _, self.loss_im_from_support = self.loss(self.recon_im_from_support, self.input_im,
+                                                    recon_albedo=recon_albedo_im_from_support,
+                                                    recon_depth=recon_depth_im_from_support,
+                                                    recon_im_mask_both=recon_im_mask_both_from_support,
                                                     conf_sigma_l1=conf_sigma_l1_norm_im,
                                                     conf_sigma_percl=conf_sigma_percl_norm_im)
 
-        self.albedo_loss = albedo_loss
-        self.flip_depth_loss = torch.abs(self.canon_depth - self.canon_depth_flip).sum()
-        self.flip_albedo_loss = torch.abs(self.canon_albedo - self.canon_albedo_flip).mean()
-
-        self.loss_total = self.loss_im + self.loss_im_flip + self.loss_flip_from_im + self.loss_im_from_flip
+        self.loss_total = self.loss_im + self.loss_im_support + self.loss_support_from_im + self.loss_im_from_support
 
         metrics = {'loss': self.loss_total}
 
@@ -365,12 +354,12 @@ class LeMul():
                                                            maxr=90).detach().cpu() / 2. + 0.5  # (B,T,C,H,W)
 
         input_im = self.input_im[:b0].detach().cpu() / 2 + 0.5
-        input_im_flip = self.input_im_flip[:b0].detach().cpu() / 2. + 0.5
+        input_im_support = self.input_im_support[:b0].detach().cpu() / 2. + 0.5
         canon_albedo = self.canon_albedo[:b0].detach().cpu() / 2. + 0.5
         recon_albedo = self.recon_albedo[:b0].detach().cpu() / 2. + 0.5
         canon_im = self.canon_im[:b0].detach().cpu() / 2. + 0.5
         recon_im = self.recon_im[:b0].detach().cpu() / 2. + 0.5
-        recon_im_flip = self.recon_im_flip[:b0].detach().cpu() / 2. + 0.5
+        recon_im_support = self.recon_im_support[:b0].detach().cpu() / 2. + 0.5
         canon_depth_raw_hist = self.canon_depth_raw.detach().unsqueeze(1).cpu()
         canon_depth_raw = self.canon_depth_raw[:b0].detach().unsqueeze(1).cpu() / 2. + 0.5
         canon_depth = ((self.canon_depth[:b0] - self.min_depth) / (
@@ -403,12 +392,12 @@ class LeMul():
             logger.add_image(label, im_grid, iter)
 
         log_grid_image('Image/input_image', input_im)
-        log_grid_image('Image/input_image_flip', input_im_flip)
+        log_grid_image('Image/input_image_support', input_im_support)
         log_grid_image('Image/canonical_albedo', canon_albedo)
         log_grid_image('Image/recon_albedo', recon_albedo)
         log_grid_image('Image/canonical_image', canon_im)
         log_grid_image('Image/recon_image', recon_im)
-        log_grid_image('Image/recon_image_flip', recon_im_flip)
+        log_grid_image('Image/recon_image_support', recon_im_support)
         log_grid_image('Image/recon_side', canon_im_rotate[:, 0, :, :, :])
         log_grid_image('Image/recon_side_2', canon_im_rotate[:, 1, :, :, :])
 
@@ -465,7 +454,7 @@ class LeMul():
         canon_albedo = self.canon_albedo[:b].detach().cpu().numpy() / 2 + 0.5
         canon_im = self.canon_im[:b].clamp(-1, 1).detach().cpu().numpy() / 2 + 0.5
         recon_im = self.recon_im[:b].clamp(-1, 1).detach().cpu().numpy() / 2 + 0.5
-        recon_im_flip = self.recon_im[b:].clamp(-1, 1).detach().cpu().numpy() / 2 + 0.5
+        recon_im_support = self.recon_im[b:].clamp(-1, 1).detach().cpu().numpy() / 2 + 0.5
         canon_depth = ((self.canon_depth[:b] - self.min_depth) / (self.max_depth - self.min_depth)).clamp(0,
                                                                                                           1).detach().cpu().unsqueeze(
             1).numpy()
@@ -491,7 +480,7 @@ class LeMul():
         utils.save_images(save_dir, canon_albedo, suffix='canonical_albedo', sep_folder=sep_folder)
         utils.save_images(save_dir, canon_im, suffix='canonical_image', sep_folder=sep_folder)
         utils.save_images(save_dir, recon_im, suffix='recon_image', sep_folder=sep_folder)
-        utils.save_images(save_dir, recon_im_flip, suffix='recon_image_flip', sep_folder=sep_folder)
+        utils.save_images(save_dir, recon_im_support, suffix='recon_image_support', sep_folder=sep_folder)
         utils.save_images(save_dir, canon_depth, suffix='canonical_depth', sep_folder=sep_folder)
         utils.save_images(save_dir, recon_depth, suffix='recon_depth', sep_folder=sep_folder)
         utils.save_images(save_dir, canon_diffuse_shading, suffix='canonical_diffuse_shading', sep_folder=sep_folder)
