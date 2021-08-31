@@ -80,10 +80,11 @@ class Demo:
 
     def load_checkpoint(self):
         print(f"Loading checkpoint from {self.checkpoint_path}")
-        self.netD.load_state_dict(torch.load(os.path.join(self.checkpoint_path, "netD.pth"), map_location=self.device))
-        self.netA.load_state_dict(torch.load(os.path.join(self.checkpoint_path, "netA.pth"), map_location=self.device))
-        self.netL.load_state_dict(torch.load(os.path.join(self.checkpoint_path, "netL.pth"), map_location=self.device))
-        self.netV.load_state_dict(torch.load(os.path.join(self.checkpoint_path, "netV.pth"), map_location=self.device))
+        cp = torch.load(self.checkpoint_path, map_location=self.device)
+        self.netD.load_state_dict(cp["netD"])
+        self.netA.load_state_dict(cp["netA"])
+        self.netL.load_state_dict(cp["netL"])
+        self.netV.load_state_dict(cp["netV"])
 
     def depth_to_3d_grid(self, depth, inv_K=None):
         if inv_K is None:
