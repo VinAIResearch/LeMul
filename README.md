@@ -52,7 +52,7 @@ Please download and place pretrained models in `./pretrained` folder.
 ## Experiments
 ### Demo
 ```
-python demo/demo.py --input path-to-cropped-image-folder --result path-to-result-folder --checkpoint path-to-checkpoint-folder
+python demo/demo.py --input path-to-cropped-image-folder --result path-to-result-folder --checkpoint path-to-checkpoint.pth
 ```
 
 *Options*:
