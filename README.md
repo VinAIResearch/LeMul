@@ -6,8 +6,8 @@
     - [Installation](#installation)
     - [Pretrained models](#pretrained-models)
 1. [Experiments](#experiments)
-        - [Demo](#demo)
-        - [Training & Testing](#training-and-testing)
+    - [Demo](#demo)
+    - [Training & Testing](#training-and-testing)
 
 # Toward Realistic Single-View 3D Object Reconstruction with Unsupervised Learning from Multiple Images
 
