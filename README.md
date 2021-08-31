@@ -2,9 +2,9 @@
 
 1. [Introduction](#toward-realistic-single-view-3d-object-reconstruction-with-unsupervised-learning-from-multiple-images)
 1. [Getting Started](#getting-started)
-        - [Datasets](#datasets)
-        - [Installation](#installation)
-        - [Pretrained models](#pretrained-models)
+    - [Datasets](#datasets)
+    - [Installation](#installation)
+    - [Pretrained models](#pretrained-models)
 1. [Experiments](#experiments)
         - [Demo](#demo)
         - [Training & Testing](#training-and-testing)
