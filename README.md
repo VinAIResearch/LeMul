@@ -31,7 +31,7 @@ conda env create -f environment.yml
 3. BFM dataset generated using [Basel Face Model](https://faces.dmi.unibas.ch/bfm/).
 4. Cat face dataset composed of [Cat Head Dataset](http://academictorrents.com/details/c501571c29d16d7f41d159d699d0e7fb37092cbd) and [Oxford-IIIT Pet Dataset](http://www.robots.ox.ac.uk/~vgg/data/pets/) ([license](https://creativecommons.org/licenses/by-sa/4.0/)).
 
-These can be found here: [Google drive]()
+These can be found here: [Google drive](https://drive.google.com/drive/folders/1fe8UgX957hyqCJNm6gyMJqypptk9Ntn_?usp=sharing)
 
 Please download and place desired dataset in `./data/` folder.
 
@@ -39,7 +39,7 @@ Please remember to cite the corresponding papers if you use these datasets.
 
 
 ### Pretrained Models
-Pretrained models can be found here: [Google drive]()
+Pretrained models can be found here: [Google drive](https://drive.google.com/drive/folders/1fe8UgX957hyqCJNm6gyMJqypptk9Ntn_?usp=sharing)
 Please download and place pretrained models in `./pretrained` folder.
 
 ### Demo
