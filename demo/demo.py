@@ -289,15 +289,9 @@ class Demo:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Demo configurations.")
-    parser.add_argument(
-        "--input", default="./demo/vinai", type=str, help="Path to the directory containing input images"
-    )
-    parser.add_argument(
-        "--result", default="./demo/results_vinai", type=str, help="Path to the directory for saving results"
-    )
-    parser.add_argument(
-        "--checkpoint", default="./pretrained/checkpoint010.pth", type=str, help="Path to the checkpoint file"
-    )
+    parser.add_argument("--input", default="", type=str, help="Path to the directory containing input images")
+    parser.add_argument("--result", default="", type=str, help="Path to the directory for saving results")
+    parser.add_argument("--checkpoint", default="", type=str, help="Path to the checkpoint file")
     parser.add_argument("--output_size", default=128, type=int, help="Output image size")
     parser.add_argument("--gpu", default=True, action="store_true", help="Enable GPU")
     parser.add_argument("--render_video", default=False, action="store_true", help="Render 3D animations to video")

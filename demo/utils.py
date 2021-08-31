@@ -215,3 +215,8 @@ def export_to_obj_string(vertices, normal):
         mtl += "\nmap_Kd $TXTFILE"
         mtls += [mtl]
     return objs, mtls
+
+
+def xmkdir(path):
+    """Create directory PATH recursively if it does not exist."""
+    os.makedirs(path, exist_ok=True)
