@@ -20,7 +20,11 @@ We propose a general framework without symmetry constraint, called **LeMul**, th
 Details of the dataset construction, model architecture, and experimental results can be found in [our following paper]().
 
 ```
-@inproceedings{
+@inproceedings{ho2021lemul,
+      title={Toward Realistic Single-View 3D Object Reconstruction with Unsupervised Learning from Multiple Images},
+      author={Ho, Long-Nhat and Tran, Anh and Phung, Quynh, and Minh Hoai},
+      booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision},
+      year={2021}
 }
 ```
 **Please CITE** our paper whenever our datasets or model implementation is used to help produce published results or incorporated into other software.
@@ -31,6 +35,7 @@ Details of the dataset construction, model architecture, and experimental result
 1. [CelebA](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html) face dataset. Please download the original images (`img_celeba.7z`) from their [website](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html) and run `celeba_crop.py` in `data/` to crop the images.
 2. Synthetic face dataset generated using [Basel Face Model](https://faces.dmi.unibas.ch/bfm/). This can be downloaded using the script `download_synface.sh` provided in `data/`.
 3. Cat face dataset composed of [Cat Head Dataset](http://academictorrents.com/details/c501571c29d16d7f41d159d699d0e7fb37092cbd) and [Oxford-IIIT Pet Dataset](http://www.robots.ox.ac.uk/~vgg/data/pets/) ([license](https://creativecommons.org/licenses/by-sa/4.0/)). This can be downloaded using the script `download_cat.sh` provided in `data/`.
+4. [Youtube Faces dataset](http://www.cs.tau.ac.il/~wolf/ytfaces/). This can be found here: [Google Drive](https://drive.google.com/drive/folders/1B1EcY6LXTlYFUPiMERzLxp4HjiOHgtiD?usp=sharing)
 
 Please remember to cite the corresponding papers if you use these datasets.
 
@@ -46,7 +51,7 @@ conda env create -f environment.yml
 
 
 ### Pretrained Models
-Pretrained models can be found here: [Google drive](https://drive.google.com/drive/folders/1fe8UgX957hyqCJNm6gyMJqypptk9Ntn_?usp=sharing)
+Pretrained models can be found here: [Google Drive](https://drive.google.com/drive/folders/1B1EcY6LXTlYFUPiMERzLxp4HjiOHgtiD?usp=sharing)
 Please download and place pretrained models in `./pretrained` folder.
 
 ## Experiments
