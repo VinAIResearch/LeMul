@@ -81,6 +81,5 @@ python run.py --config experiments/test_multi_CASIA.yml --gpu 0 --num_workers 4
 ### Texture finetuning
 With collection-style datasets such as CASIA, you can finetune the texture estimation network after training. Check the configuration file `experiments/finetune_CASIA.yml` as an example. You can run it with the command:
 ```
-# Training
 python run.py --config experiments/finetune_CASIA.yml --gpu 0 --num_workers 4
-
+```
