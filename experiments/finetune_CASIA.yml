@@ -1,0 +1,37 @@
+## finetune texture of CASIA's model
+## trainer
+run_train: true
+run_finetune: true
+num_epochs: 10
+batch_size: 24
+checkpoint_dir: results/CASIA_ft
+save_checkpoint_freq: 1
+keep_num_checkpoint: 2
+resume: true
+use_logger: true
+log_freq: 100
+crop: 176
+upsize: 1.1
+
+## dataloader
+num_workers: 4
+image_size: 64
+load_gt_depth: false
+train_val_data_dir: data/casia
+checkpoint_name: ../CASIA/checkpoint200.pth
+
+## model
+model_name: unsup3d_casia
+min_depth: 0.9
+max_depth: 1.1
+xyz_rotation_range: 90  # (-r,r) in degrees
+xy_translation_range: 0.1  # (-t,t) in 3D
+z_translation_range: 0.1  # (-t,t) in 3D
+lam_perc: 1
+lam_flip: 0.5
+lr: 0.0001
+
+## renderer
+rot_center_depth: 1.0
+fov: 10  # in degrees
+tex_cube_size: 2

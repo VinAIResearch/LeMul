@@ -13,6 +13,7 @@ def get_data_loaders(cfgs):
     crop = cfgs.get("crop", None)
 
     run_train = cfgs.get("run_train", False)
+    run_finetune = cfgs.get("run_finetune", False)
     train_val_data_dir = cfgs.get("train_val_data_dir", "./data")
     run_test = cfgs.get("run_test", False)
     test_data_dir = cfgs.get("test_data_dir", "./data/test")
@@ -41,7 +42,12 @@ def get_data_loaders(cfgs):
             )
         else:
             train_loader = get_image_loader(
-                data_dir=train_data_dir, is_validation=False, batch_size=batch_size, image_size=image_size, crop=crop
+                data_dir=train_data_dir,
+                is_validation=False,
+                batch_size=batch_size,
+                image_size=image_size,
+                crop=crop,
+                is_finetune=run_finetune,
             )
         print(f"Loading validation data from {val_data_dir}")
         if load_gt_depth:
@@ -56,7 +62,12 @@ def get_data_loaders(cfgs):
             )
         else:
             val_loader = get_image_loader(
-                data_dir=val_data_dir, is_validation=True, batch_size=batch_size, image_size=image_size, crop=crop
+                data_dir=val_data_dir,
+                is_validation=True,
+                batch_size=batch_size,
+                image_size=image_size,
+                crop=crop,
+                is_finetune=run_finetune,
             )
     if run_test:
         assert os.path.isdir(test_data_dir), "Testing data directory does not exist: %s" % test_data_dir
@@ -166,8 +177,118 @@ class ImageDataset(torch.utils.data.Dataset):
         return "ImageDataset"
 
 
-def get_image_loader(data_dir, is_validation=False, batch_size=256, num_workers=4, image_size=256, crop=None):
-    dataset = ImageDataset(data_dir, image_size=image_size, crop=crop, is_validation=is_validation)
+def make_collection_dataset(dir, is_finetune=False):
+    assert os.path.isdir(dir), "%s is not a valid directory" % dir
+    videos = sorted(os.listdir(dir))
+    images = []
+    for vid in videos:
+        frames = sorted(os.listdir(dir + "/" + vid))
+        frames = [x for x in frames if is_image_file(x)]
+        if is_finetune:
+            images += [[dir + "/" + vid, x] for x in frames]
+        else:
+            if len(frames) < 2:
+                continue
+            images.append([dir + "/" + vid, frames])
+    random.shuffle(images)
+    return images
+
+
+class CollectionDataset(torch.utils.data.Dataset):
+    def __init__(self, data_dir, image_size=256, crop=None, gap=0, is_validation=False, is_finetune=False):
+        super(CollectionDataset, self).__init__()
+        if is_validation:
+            self.root = os.path.join(data_dir, "val")
+            self.paths = make_collection_dataset(self.root, is_finetune)
+        else:
+            self.root = os.path.join(data_dir, "train")
+            self.paths = make_collection_dataset(self.root, is_finetune)
+        self.size = len(self.paths)
+        self.image_size = image_size
+        self.crop = crop
+        self.is_validation = is_validation
+        self.is_finetune = is_finetune
+        self.gap = gap
+
+    def single_transform(self, img):
+        if self.crop is not None:
+            if isinstance(self.crop, int):
+                if not self.is_validation and self.gap > 0:
+                    k1 = random.randint(0, self.gap)
+                    k2 = random.randint(0, k1)
+
+                    img = tfs.CenterCrop(self.crop + k1)(img)
+                    img = tfs.RandomCrop(self.crop + k2)(img)
+                else:
+                    img = tfs.CenterCrop(self.crop)(img)
+            else:
+                assert (
+                    len(self.crop) == 4
+                ), "Crop size must be an integer for center crop, or a list of 4 integers (y0,x0,h,w)"
+                img = tfs.functional.crop(img, *self.crop)
+        img = tfs.functional.resize(img, (self.image_size, self.image_size))
+        # if random.random() < 0.8:
+        #    img = tfs.RandomRotation(degrees=(-90, 90))(img)
+        img_tensor = tfs.functional.to_tensor(img)
+        return img_tensor
+
+    def transform(self, imgs):
+        img1, img2 = imgs[0], imgs[1]
+        if self.crop is not None:
+            if isinstance(self.crop, int):
+                if not self.is_validation and self.gap > 0:
+                    k1 = random.randint(0, self.gap)
+                    k2 = random.randint(0, k1)
+
+                    img1 = tfs.CenterCrop(self.crop + k1)(img1)
+                    img2 = tfs.CenterCrop(self.crop + k1)(img2)
+                    img1 = tfs.RandomCrop(self.crop + k2)(img1)
+                    img2 = tfs.RandomCrop(self.crop + k2)(img2)
+                else:
+                    img1 = tfs.CenterCrop(self.crop)(img1)
+                    img2 = tfs.CenterCrop(self.crop)(img2)
+            else:
+                assert (
+                    len(self.crop) == 4
+                ), "Crop size must be an integer for center crop, or a list of 4 integers (y0,x0,h,w)"
+                img1 = tfs.functional.crop(img1, *self.crop)
+                img2 = tfs.functional.crop(img2, *self.crop)
+        img1 = tfs.functional.resize(img1, (self.image_size, self.image_size))
+        img2 = tfs.functional.resize(img2, (self.image_size, self.image_size))
+        img1_tensor = tfs.functional.to_tensor(img1)
+        img2_tensor = tfs.functional.to_tensor(img2)
+        return img1_tensor, img2_tensor
+
+    def __getitem__(self, index):
+        v = self.paths[index % self.size]
+        if self.is_finetune:
+            img = Image.open(v[0] + "/" + v[1]).convert("RGB")
+            return self.single_transform(img)
+        else:
+            vid = v[0]
+            frames = v[1]
+            idx = random.sample(frames, 2)
+            # idx = frames
+            img1 = Image.open(vid + "/" + idx[0]).convert("RGB")
+            img2 = Image.open(vid + "/" + idx[1]).convert("RGB")
+            return self.transform([img1, img2])
+
+    def __len__(self):
+        return self.size
+
+    def name(self):
+        return "CollectionDataset"
+
+
+def get_image_loader(
+    data_dir, is_validation=False, batch_size=256, num_workers=4, image_size=256, crop=None, is_finetune=False
+):
+    if "casia" in data_dir.lower() or "ytf" in data_dir.lower():
+        dataset = CollectionDataset(
+            data_dir, image_size=image_size, crop=crop, is_validation=is_validation, is_finetune=is_finetune
+        )
+    else:
+        dataset = ImageDataset(data_dir, image_size=image_size, crop=crop, is_validation=is_validation)
     loader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, shuffle=not is_validation, num_workers=num_workers, pin_memory=True
     )

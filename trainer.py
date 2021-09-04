@@ -17,6 +17,7 @@ class Trainer:
         self.save_checkpoint_freq = cfgs.get("save_checkpoint_freq", 1)
         self.keep_num_checkpoint = cfgs.get("keep_num_checkpoint", 2)  # -1 for keeping all checkpoints
         self.resume = cfgs.get("resume", True)
+        self.run_finetune = cfgs.get("run_finetune", False)
         self.use_logger = cfgs.get("use_logger", True)
         self.log_freq = cfgs.get("log_freq", 100)
         self.archive_code = cfgs.get("archive_code", True)
@@ -96,7 +97,9 @@ class Trainer:
         self.model.init_optimizers()
 
         # resume from checkpoint
-        if self.resume:
+        if self.run_finetune:
+            self.load_checkpoint(optim=False)
+        elif self.resume:
             start_epoch = self.load_checkpoint(optim=True)
 
         # initialize tensorboardX logger

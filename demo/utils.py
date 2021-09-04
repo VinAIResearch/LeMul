@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import yaml
 
 
 class Encoder(nn.Module):
@@ -220,3 +221,9 @@ def export_to_obj_string(vertices, normal):
 def xmkdir(path):
     """Create directory PATH recursively if it does not exist."""
     os.makedirs(path, exist_ok=True)
+
+
+def load_yaml(path):
+    print(f"Loading configs from {path}")
+    with open(path, "r") as f:
+        return yaml.safe_load(f)

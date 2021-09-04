@@ -36,6 +36,11 @@ class LeMul:
         self.netC = networks.ConfNet(cin=3, cout=1, nf=64, zdim=128)
         self.netC2 = networks.ConfNet(cin=6, cout=1, nf=64, zdim=128)
         self.network_names = [k for k in vars(self) if "net" in k]
+        self.run_finetune = cfgs.get("run_finetune", False)
+        if self.run_finetune:
+            self.net_optimize_names = ["netA", "netC", "netL"]
+        else:
+            self.net_optimize_names = self.network_names
 
         """Albedo loss's kernels"""
         # ====================================================#
@@ -68,7 +73,7 @@ class LeMul:
 
     def init_optimizers(self):
         self.optimizer_names = []
-        for net_name in self.network_names:
+        for net_name in self.net_optimize_names:
             optimizer = self.make_optimizer(getattr(self, net_name))
             optim_name = net_name.replace("net", "optimizer")
             setattr(self, optim_name, optimizer)
@@ -105,7 +110,7 @@ class LeMul:
                 setattr(self, param_name, getattr(self, param_name).to(device))
 
     def set_train(self):
-        for net_name in self.network_names:
+        for net_name in self.net_optimize_names:
             getattr(self, net_name).train()
 
     def set_eval(self):
@@ -338,11 +343,10 @@ class LeMul:
     def forward(self, input):
         if self.load_gt_depth:
             input, input_support, depth_gt = input
-        else:
+        elif not self.run_finetune:
             input, input_support = input
 
         self.input_im = input.to(self.device) * 2.0 - 1.0
-        self.input_im_support = input_support.to(self.device) * 2.0 - 1.0
         b, c, h, w = self.input_im.shape
 
         (
@@ -368,80 +372,86 @@ class LeMul:
             self.recon_albedo,
         ) = self.process(self.input_im)
 
-        (
-            self.view_support,
-            self.canon_depth_raw_support,
-            self.canon_diffuse_shading_support,
-            self.canon_albedo_support,
-            self.recon_im_support,
-            self.recon_depth_support,
-            self.recon_normal_support,
-            self.canon_im_support,
-            self.canon_depth_support,
-            self.canon_normal_support,
-            self.conf_sigma_l1_support,
-            self.conf_sigma_percl_support,
-            self.canon_light_support,
-            recon_im_mask_support,
-            recon_im_mask_both_support,
-            loss_l1_im_support,
-            loss_perc_im_support,
-            albedo_loss_support,
-            self.loss_im_support,
-            self.recon_albedo_support,
-        ) = self.process(self.input_im_support)
+        if not self.run_finetune:
+            self.input_im_support = input_support.to(self.device) * 2.0 - 1.0
+            (
+                self.view_support,
+                self.canon_depth_raw_support,
+                self.canon_diffuse_shading_support,
+                self.canon_albedo_support,
+                self.recon_im_support,
+                self.recon_depth_support,
+                self.recon_normal_support,
+                self.canon_im_support,
+                self.canon_depth_support,
+                self.canon_normal_support,
+                self.conf_sigma_l1_support,
+                self.conf_sigma_percl_support,
+                self.canon_light_support,
+                recon_im_mask_support,
+                recon_im_mask_both_support,
+                loss_l1_im_support,
+                loss_perc_im_support,
+                albedo_loss_support,
+                self.loss_im_support,
+                self.recon_albedo_support,
+            ) = self.process(self.input_im_support)
 
-        (
-            _,
-            _,
-            self.recon_support_from_im,
-            recon_depth_support_from_im,
-            _,
-            canon_im_support_from_im,
-            _,
-            _,
-            recon_im_mask_both_support_from_im,
-            recon_albedo_support_from_im,
-        ) = self.render(self.canon_albedo, self.canon_depth, self.canon_light_support, self.view_support)
-        conf_sigma_l1_norm_support, conf_sigma_percl_norm_support = self.netC2(
-            torch.cat((self.input_im, self.input_im_support), 1)
-        )  # Bx1xHxW
-        _, _, _, self.loss_support_from_im = self.loss(
-            self.recon_support_from_im,
-            self.input_im_support,
-            recon_albedo=recon_albedo_support_from_im,
-            recon_depth=recon_depth_support_from_im,
-            recon_im_mask_both=recon_im_mask_both_support_from_im,
-            conf_sigma_l1=conf_sigma_l1_norm_support,
-            conf_sigma_percl=conf_sigma_percl_norm_support,
-        )
+            (
+                _,
+                _,
+                self.recon_support_from_im,
+                recon_depth_support_from_im,
+                _,
+                canon_im_support_from_im,
+                _,
+                _,
+                recon_im_mask_both_support_from_im,
+                recon_albedo_support_from_im,
+            ) = self.render(self.canon_albedo, self.canon_depth, self.canon_light_support, self.view_support)
+            conf_sigma_l1_norm_support, conf_sigma_percl_norm_support = self.netC2(
+                torch.cat((self.input_im, self.input_im_support), 1)
+            )  # Bx1xHxW
+            _, _, _, self.loss_support_from_im = self.loss(
+                self.recon_support_from_im,
+                self.input_im_support,
+                recon_albedo=recon_albedo_support_from_im,
+                recon_depth=recon_depth_support_from_im,
+                recon_im_mask_both=recon_im_mask_both_support_from_im,
+                conf_sigma_l1=conf_sigma_l1_norm_support,
+                conf_sigma_percl=conf_sigma_percl_norm_support,
+            )
 
-        (
-            _,
-            _,
-            self.recon_im_from_support,
-            recon_depth_im_from_support,
-            _,
-            canon_im_from_support,
-            _,
-            _,
-            recon_im_mask_both_from_support,
-            recon_albedo_im_from_support,
-        ) = self.render(self.canon_albedo_support, self.canon_depth_support, self.canon_light, self.view)
-        conf_sigma_l1_norm_im, conf_sigma_percl_norm_im = self.netC2(
-            torch.cat((self.input_im_support, self.input_im), 1)
-        )  # Bx1xHxW
-        _, _, _, self.loss_im_from_support = self.loss(
-            self.recon_im_from_support,
-            self.input_im,
-            recon_albedo=recon_albedo_im_from_support,
-            recon_depth=recon_depth_im_from_support,
-            recon_im_mask_both=recon_im_mask_both_from_support,
-            conf_sigma_l1=conf_sigma_l1_norm_im,
-            conf_sigma_percl=conf_sigma_percl_norm_im,
-        )
+            (
+                _,
+                _,
+                self.recon_im_from_support,
+                recon_depth_im_from_support,
+                _,
+                canon_im_from_support,
+                _,
+                _,
+                recon_im_mask_both_from_support,
+                recon_albedo_im_from_support,
+            ) = self.render(self.canon_albedo_support, self.canon_depth_support, self.canon_light, self.view)
+            conf_sigma_l1_norm_im, conf_sigma_percl_norm_im = self.netC2(
+                torch.cat((self.input_im_support, self.input_im), 1)
+            )  # Bx1xHxW
+            _, _, _, self.loss_im_from_support = self.loss(
+                self.recon_im_from_support,
+                self.input_im,
+                recon_albedo=recon_albedo_im_from_support,
+                recon_depth=recon_depth_im_from_support,
+                recon_im_mask_both=recon_im_mask_both_from_support,
+                conf_sigma_l1=conf_sigma_l1_norm_im,
+                conf_sigma_percl=conf_sigma_percl_norm_im,
+            )
 
-        self.loss_total = self.loss_im + self.loss_im_support + self.loss_support_from_im + self.loss_im_from_support
+            self.loss_total = (
+                self.loss_im + self.loss_im_support + self.loss_support_from_im + self.loss_im_from_support
+            )
+        else:
+            self.loss_total = self.loss_im
 
         metrics = {"loss": self.loss_total}
 
@@ -504,12 +514,14 @@ class LeMul:
             )  # (B,T,C,H,W)
 
         input_im = self.input_im[:b0].detach().cpu() / 2 + 0.5
-        input_im_support = self.input_im_support[:b0].detach().cpu() / 2.0 + 0.5
+        if not self.run_finetune:
+            input_im_support = self.input_im_support[:b0].detach().cpu() / 2.0 + 0.5
         canon_albedo = self.canon_albedo[:b0].detach().cpu() / 2.0 + 0.5
         recon_albedo = self.recon_albedo[:b0].detach().cpu() / 2.0 + 0.5
         canon_im = self.canon_im[:b0].detach().cpu() / 2.0 + 0.5
         recon_im = self.recon_im[:b0].detach().cpu() / 2.0 + 0.5
-        recon_im_support = self.recon_im_support[:b0].detach().cpu() / 2.0 + 0.5
+        if not self.run_finetune:
+            recon_im_support = self.recon_im_support[:b0].detach().cpu() / 2.0 + 0.5
         canon_depth_raw_hist = self.canon_depth_raw.detach().unsqueeze(1).cpu()
         canon_depth_raw = self.canon_depth_raw[:b0].detach().unsqueeze(1).cpu() / 2.0 + 0.5
         canon_depth = (
@@ -548,12 +560,14 @@ class LeMul:
             logger.add_image(label, im_grid, iter)
 
         log_grid_image("Image/input_image", input_im)
-        log_grid_image("Image/input_image_support", input_im_support)
+        if not self.run_finetune:
+            log_grid_image("Image/input_image_support", input_im_support)
         log_grid_image("Image/canonical_albedo", canon_albedo)
         log_grid_image("Image/recon_albedo", recon_albedo)
         log_grid_image("Image/canonical_image", canon_im)
         log_grid_image("Image/recon_image", recon_im)
-        log_grid_image("Image/recon_image_support", recon_im_support)
+        if not self.run_finetune:
+            log_grid_image("Image/recon_image_support", recon_im_support)
         log_grid_image("Image/recon_side", canon_im_rotate[:, 0, :, :, :])
         log_grid_image("Image/recon_side_2", canon_im_rotate[:, 1, :, :, :])
 
@@ -612,7 +626,8 @@ class LeMul:
         canon_albedo = self.canon_albedo[:b].detach().cpu().numpy() / 2 + 0.5
         canon_im = self.canon_im[:b].clamp(-1, 1).detach().cpu().numpy() / 2 + 0.5
         recon_im = self.recon_im[:b].clamp(-1, 1).detach().cpu().numpy() / 2 + 0.5
-        recon_im_support = self.recon_im[b:].clamp(-1, 1).detach().cpu().numpy() / 2 + 0.5
+        if not self.run_finetune:
+            recon_im_support = self.recon_im[b:].clamp(-1, 1).detach().cpu().numpy() / 2 + 0.5
         canon_depth = (
             ((self.canon_depth[:b] - self.min_depth) / (self.max_depth - self.min_depth))
             .clamp(0, 1)
@@ -651,7 +666,8 @@ class LeMul:
         utils.save_images(save_dir, canon_albedo, suffix="canonical_albedo", sep_folder=sep_folder)
         utils.save_images(save_dir, canon_im, suffix="canonical_image", sep_folder=sep_folder)
         utils.save_images(save_dir, recon_im, suffix="recon_image", sep_folder=sep_folder)
-        utils.save_images(save_dir, recon_im_support, suffix="recon_image_support", sep_folder=sep_folder)
+        if not self.run_finetune:
+            utils.save_images(save_dir, recon_im_support, suffix="recon_image_support", sep_folder=sep_folder)
         utils.save_images(save_dir, canon_depth, suffix="canonical_depth", sep_folder=sep_folder)
         utils.save_images(save_dir, recon_depth, suffix="recon_depth", sep_folder=sep_folder)
         utils.save_images(save_dir, canon_diffuse_shading, suffix="canonical_diffuse_shading", sep_folder=sep_folder)

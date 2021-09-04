@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from PIL import Image
-from utils import EDDeconv, Encoder, export_to_obj_string, get_grid, is_image_file, save_image, save_video
+from utils import EDDeconv, Encoder, export_to_obj_string, get_grid, is_image_file, load_yaml, save_image, save_video
 
 
 sys.path.insert(0, "./")
@@ -21,14 +21,28 @@ class Demo:
         self.checkpoint_path = args.checkpoint
         self.render_video = args.render_video
         self.output_size = args.output_size
-        self.image_size = 64
-        self.min_depth = 0.9
-        self.max_depth = 1.1
-        self.border_depth = 1.05
-        self.xyz_rotation_range = 60
-        self.xy_translation_range = 0.1
-        self.z_translation_range = 0
-        self.fov = 10  # in degrees
+        self.detect_human_face = args.detect_human_face
+        if args.config is None:
+            self.image_size = 64
+            self.min_depth = 0.9
+            self.max_depth = 1.1
+            self.border_depth = 1.05
+            self.xyz_rotation_range = 60
+            self.xy_translation_range = 0.1
+            self.z_translation_range = 0
+            self.fov = 10  # in degrees
+            self.upsize = 1
+        else:
+            cfgs = load_yaml(args.config)
+            self.image_size = cfgs.get("image_size", 64)
+            self.min_depth = cfgs.get("min_depth", 0.9)
+            self.max_depth = cfgs.get("max_depth", 1.1)
+            self.border_depth = cfgs.get("border_depth", 1.05)
+            self.xyz_rotation_range = cfgs.get("xyz_rotation_range", 60)
+            self.xy_translation_range = cfgs.get("xy_translation_range", 0.1)
+            self.z_translation_range = cfgs.get("z_translation_range", 0)
+            self.fov = cfgs.get("fov", 10)  # in degrees
+            self.upsize = cfgs.get("upsize", 1.0)
 
         self.depth_rescaler = (
             lambda d: (1 + d) / 2 * self.max_depth + (1 - d) / 2 * self.min_depth
@@ -61,6 +75,12 @@ class Demo:
         self.netA.eval()
         self.netL.eval()
         self.netV.eval()
+
+        # face detecter
+        if self.detect_human_face:
+            from facenet_pytorch import MTCNN
+
+            self.face_detector = MTCNN(select_largest=True, device=self.device)
 
         # renderer
         if self.render_video:
@@ -110,8 +130,32 @@ class Demo:
         normal = normal / (((normal ** 2).sum(3, keepdim=True)) ** 0.5 + EPS)
         return normal
 
+    def detect_face(self, im, upsize=1):
+        print("Detecting face using MTCNN face detector")
+        try:
+            bboxes, prob = self.face_detector.detect(im)
+            w0, h0, w1, h1 = bboxes[0]
+        except Exception:
+            print("Could not detect faces in the image")
+            return None
+
+        hc, wc = (h0 + h1) / 2, (w0 + w1) / 2
+        crop = int(((h1 - h0) + (w1 - w0)) / 4 * 1.1 * upsize)
+        im = np.pad(
+            im, ((crop, crop), (crop, crop), (0, 0)), mode="edge"
+        )  # allow cropping outside by replicating borders
+        h0 = int(hc - crop + crop + crop * 0.15)
+        w0 = int(wc - crop + crop)
+        return im[h0 : h0 + crop * 2, w0 : w0 + crop * 2]
+
     def run(self, pil_im):
         im = np.uint8(pil_im)
+
+        # face detection
+        if self.detect_human_face:
+            im = self.detect_face(im, self.upsize)
+            if im is None:
+                return -1
 
         h, w, _ = im.shape
         im = torch.FloatTensor(im / 255.0).permute(2, 0, 1).unsqueeze(0)
@@ -294,7 +338,14 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", default="", type=str, help="Path to the checkpoint file")
     parser.add_argument("--output_size", default=128, type=int, help="Output image size")
     parser.add_argument("--gpu", default=True, action="store_true", help="Enable GPU")
+    parser.add_argument(
+        "--detect_human_face",
+        default=False,
+        action="store_true",
+        help="Enable automatic human face detection. This does not detect cat faces.",
+    )
     parser.add_argument("--render_video", default=False, action="store_true", help="Render 3D animations to video")
+    parser.add_argument("--config", default=None, help="Config file used in training")
     args = parser.parse_args()
 
     input_dir = args.input
