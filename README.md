@@ -74,7 +74,7 @@ Pretrained models can be found here: [Google Drive](https://drive.google.com/dri
 Please download and place pretrained models in `./pretrained` folder.
 
 ### Demo
-Prepare input image folder and pretrained models and run demo, eg:
+After downloading pretrained models and preparing input image folder, you can run demo, eg:
 ```
 python demo/demo.py --input demo/human_face_cropped --result demo/human_face_results --checkpoint pretrained/casia_checkpoint028.pth
 ```
