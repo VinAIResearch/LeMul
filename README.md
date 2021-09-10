@@ -4,10 +4,12 @@
 1. [Getting Started](#getting-started)
     - [Datasets](#datasets)
     - [Installation](#installation)
-    - [Pretrained models](#pretrained-models)
 1. [Experiments](#experiments)
-    - [Demo](#demo)
     - [Training & Testing](#training-and-testing)
+    - [Pretrained models](#pretrained-models)
+    - [Texture fine-tuning](#texture-fine-tuning)
+    - [Demo](#demo)
+
 
 # Toward Realistic Single-View 3D Object Reconstruction with Unsupervised Learning from Multiple Images
 
@@ -17,7 +19,7 @@ We propose a general framework without symmetry constraint, called **LeMul**, th
 <img src="./image/teaser.png" width="800">
 
 
-Details of the dataset construction, model architecture, and experimental results can be found in [our following paper](https://arxiv.org/abs/2109.02288).
+Details of the model architecture and experimental results can be found in [our following paper](https://arxiv.org/abs/2109.02288).
 
 ```
 @inproceedings{ho2021lemul,
@@ -27,7 +29,7 @@ Details of the dataset construction, model architecture, and experimental result
       year={2021}
 }
 ```
-**Please CITE** our paper whenever our datasets or model implementation is used to help produce published results or incorporated into other software.
+**Please CITE** our paper whenever our model implementation is used to help produce published results or incorporated into other software.
 
 ## Getting Started
 
@@ -50,24 +52,7 @@ conda env create -f environment.yml
 ```
 
 
-### Pretrained Models
-Pretrained models can be found here: [Google Drive](https://drive.google.com/drive/folders/1-AI_JRv6vR4k0p_jdasrQhxg9PywvreF)
-Please download and place pretrained models in `./pretrained` folder.
-
 ## Experiments
-### Demo
-```
-python demo/demo.py --input path-to-cropped-image-folder --result path-to-result-folder --checkpoint path-to-checkpoint.pth
-```
-
-*Options*:
-- `--config path-to-training-config-file.yml`: input the config file used in training (recommendded)
-- `--detect_human_face`: enable automatic human face detection and cropping using MTCNN. You need to install [facenet-pytorch](https://github.com/timesler/facenet-pytorch) before using this option. This only works on human face images
-- `--gpu`: enable GPU
-- `--render_video`: render 3D animations using [neural_renderer](https://github.com/daniilidis-group/neural_renderer) (GPU is required)
-
-To replicate the results reported in the paper with the model pretrained on the CASIA dataset, use the `--detect_human_face` option with images in folder `demo/images/human_face` and skip that flag with images in `demo/images/human_face_cropped`.
-
 ### Training and Testing
 Check the configuration files in `experiments/` and run experiments, eg:
 ```
@@ -78,8 +63,26 @@ python run.py --config experiments/train_multi_CASIA.yml --gpu 0 --num_workers 4
 python run.py --config experiments/test_multi_CASIA.yml --gpu 0 --num_workers 4
 ```
 
-### Texture finetuning
-With collection-style datasets such as CASIA, you can finetune the texture estimation network after training. Check the configuration file `experiments/finetune_CASIA.yml` as an example. You can run it with the command:
+### Texture fine-tuning
+With collection-style datasets such as CASIA, you can fine-tune the texture estimation network after training. Check the configuration file `experiments/finetune_CASIA.yml` as an example. You can run it with the command:
 ```
 python run.py --config experiments/finetune_CASIA.yml --gpu 0 --num_workers 4
 ```
+
+### Pretrained Models
+Pretrained models can be found here: [Google Drive](https://drive.google.com/drive/folders/1-AI_JRv6vR4k0p_jdasrQhxg9PywvreF)
+Please download and place pretrained models in `./pretrained` folder.
+
+### Demo
+Prepare input image folder and pretrained models and run demo, eg:
+```
+python demo/demo.py --input demo/human_face_cropped --result demo/human_face_results --checkpoint pretrained/casia_checkpoint028.pth
+```
+
+*Options*:
+- `--config path-to-training-config-file.yml`: input the config file used in training (recommended)
+- `--detect_human_face`: enable automatic human face detection and cropping using MTCNN. You need to install [facenet-pytorch](https://github.com/timesler/facenet-pytorch) before using this option. This only works on human face images
+- `--gpu`: enable GPU
+- `--render_video`: render 3D animations using [neural_renderer](https://github.com/daniilidis-group/neural_renderer) (GPU is required)
+
+To replicate the results reported in the paper with the model pretrained on the CASIA dataset, use the `--detect_human_face` option with images in folder `demo/images/human_face` and skip that flag with images in `demo/images/human_face_cropped`.
