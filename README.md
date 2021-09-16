@@ -24,7 +24,7 @@ Details of the model architecture and experimental results can be found in [our 
 ```
 @inproceedings{ho2021lemul,
       title={Toward Realistic Single-View 3D Object Reconstruction with Unsupervised Learning from Multiple Images},
-      author={Ho, Long-Nhat and Tran, Anh and Phung, Quynh, and Minh Hoai},
+      author={Long-Nhat Ho and Anh Tran and Quynh Phung and Minh Hoai},
       booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision},
       year={2021}
 }
